@@ -65,7 +65,6 @@ class GameEnv(object):
         self.apple = apple(self.gridsize, occupied=self.snake.cells())
         self.gameover = False
         self.win = False
-        self.truncated = False
         self.timeSinceApple = 0
         return self.get_state()
 
@@ -84,11 +83,11 @@ class GameEnv(object):
         return {'score': self.apple.score,
                 'length': self.snake.len,
                 'won': self.win,
-                'truncated': self.truncated}
+                }
 
     def update(self, move):
         if self.gameover:
-            return self.get_state(), 0., True, self.info()
+            return 0., True, self.info()
 
         d = moves[actions[move]]
         if not np.array_equal(d, -self.snake.dir):
@@ -110,9 +109,9 @@ class GameEnv(object):
                 self.win = True
         elif self.timeSinceApple >= self.steplimit():
             self.gameover = True
-            self.truncated = True
+            reward = self.DEATH_REWARD
 
-        return self.get_state(), reward, self.gameover, self.info()
+        return reward, self.gameover, self.info()
 
     def state_shape(self):
         return (2, self.gridsize + 2, self.gridsize + 2)
@@ -120,15 +119,19 @@ class GameEnv(object):
     def get_state(self):
         size = self.gridsize + 2
         state = np.zeros((2,size,size),dtype = np.float32)
+        n = len(self.snake.prevpos)
+        growing = n < self.snake.len
+        for i,p in enumerate(self.snake.prevpos):
+            state[0,int(p[0])+1,int(p[1])+1] = (i+1)/(n+1)
+            if i > 0 or growing:
+                state[1,int(p[0])+1,int(p[1])+1] = 1.
+        state[0,int(self.apple.pos[0])+1,int(self.apple.pos[1])+1] = -1.
+        state[0,0,:] = 1.
+        state[0,-1,:] = 1.
+        state[0,:,0] = 1.
+        state[0,:,-1] = 1.
         state[1,0,:] = 1.
         state[1,-1,:] = 1.
         state[1,:,0] = 1.
         state[1,:,-1] = 1.
-        n = len(self.snake.prevpos)
-        growing = n < self.snake.len
-        for i,p in enumerate(self.snake.prevpos):
-            state[0,int(p[0])+1,int(p[1])+1] = (i+1)/n
-            if i > 0 or growing:
-                state[1,int(p[0])+1,int(p[1])+1] = 1.
-        state[0,int(self.apple.pos[0])+1,int(self.apple.pos[1])+1] = -1.
         return state
